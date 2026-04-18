@@ -23,6 +23,7 @@ import {
   SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useAuth } from "@/contexts/AuthContext";
 
 const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -37,6 +38,7 @@ const secondaryItems = [
 ];
 
 export function AppSidebar() {
+  const { logout } = useAuth();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
@@ -99,11 +101,9 @@ export function AppSidebar() {
       <SidebarFooter className="p-2">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <NavLink to="/login">
+            <SidebarMenuButton onClick={logout}>
                 <LogOut className="h-4 w-4" />
                 {!collapsed && <span>Cerrar sesión</span>}
-              </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
