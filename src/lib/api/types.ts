@@ -8,6 +8,8 @@ export type CreatedByProcess = "manual" | "ai";
 
 export type GeneratedFileFormat = "pdf" | "docx";
 
+export type CvStylePreset = "ats" | "harvard" | "moderno";
+
 export type CvImprovementRequestStatus =
   | "pending"
   | "processing"
@@ -101,6 +103,7 @@ export interface CvVersionSummary {
   versionNumber: number;
   versionType: CvVersionType;
   targetRole: string;
+  stylePreset: CvStylePreset;
   isCurrent: boolean;
   createdByProcess: CreatedByProcess;
   generatedFileUrl: string | null;
@@ -255,6 +258,7 @@ export interface CreateCvPayload {
   title?: string;
   targetRole: string;
   sourceType?: CvSourceType;
+  stylePreset?: CvStylePreset;
   jobDescription?: string;
   personalDetails: {
     fullName: string;
@@ -283,11 +287,49 @@ export interface CreateCvPayload {
   skillsText?: string;
 }
 
+export interface GenerateCvFromFormPayload extends CreateCvPayload {
+  generationInstructions?: string;
+}
+
+export interface UpdateManualCvVersionPayload {
+  title?: string;
+  targetRole?: string;
+  jobDescription?: string;
+  summaryText?: string;
+  skillsText?: string;
+  stylePreset?: CvStylePreset;
+  personalDetails?: {
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    professionalSummary?: string;
+  };
+  workExperiences?: Array<{
+    companyName: string;
+    jobTitle: string;
+    periodLabel: string;
+    startDate?: string;
+    endDate?: string;
+    isCurrent?: boolean;
+    description?: string;
+  }>;
+  educationEntries?: Array<{
+    institutionName: string;
+    degreeTitle: string;
+    periodLabel: string;
+    startDate?: string;
+    endDate?: string;
+  }>;
+  skills?: string[];
+}
+
 export interface CreateImprovedCvVersionPayload {
   targetRole: string;
   jobDescription?: string;
   summaryText?: string;
   skillsText?: string;
+  stylePreset?: CvStylePreset;
   generatedFileUrl?: string;
   generatedFileFormat?: GeneratedFileFormat;
   createdByProcess?: CreatedByProcess;

@@ -3,6 +3,7 @@ import {
   FileUp,
   FilePlus,
   History,
+  Sparkles,
   BarChart3,
   Settings,
   LogOut,
@@ -28,6 +29,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Mejorar CV", url: "/mejorar-cv", icon: FileUp },
+  { title: "Solicitudes IA", url: "/solicitudes-mejora", icon: Sparkles },
   { title: "Crear CV", url: "/crear-cv", icon: FilePlus },
   { title: "Historial", url: "/historial", icon: History },
   { title: "Reportes", url: "/reportes", icon: BarChart3 },
@@ -43,7 +45,8 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const currentPath = location.pathname;
-  const isActive = (path: string) => currentPath === path;
+  const isActive = (path: string) =>
+    currentPath === path || currentPath.startsWith(`${path}/`);
 
   return (
     <Sidebar collapsible="icon">

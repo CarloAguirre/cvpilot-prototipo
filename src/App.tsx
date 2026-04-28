@@ -12,7 +12,9 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import MejorarCV from "./pages/MejorarCV";
 import CrearCV from "./pages/CrearCV";
+import DetalleCV from "./pages/DetalleCV";
 import Historial from "./pages/Historial";
+import SolicitudesMejora from "./pages/SolicitudesMejora";
 import Reportes from "./pages/Reportes";
 import Configuracion from "./pages/Configuracion";
 import NotFound from "./pages/NotFound";
@@ -26,7 +28,12 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
           <Routes>
             <Route path="/" element={<Index />} />
             <Route element={<PublicOnlyRoute />}>
@@ -37,8 +44,10 @@ const App = () => (
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/mejorar-cv" element={<MejorarCV />} />
+                <Route path="/solicitudes-mejora" element={<SolicitudesMejora />} />
                 <Route path="/crear-cv" element={<CrearCV />} />
                 <Route path="/historial" element={<Historial />} />
+                <Route path="/historial/:cvId" element={<DetalleCV />} />
                 <Route path="/reportes" element={<Reportes />} />
                 <Route path="/configuracion" element={<Configuracion />} />
               </Route>

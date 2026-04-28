@@ -1,24 +1,102 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Download, Eye, Trash2, Search } from "lucide-react";
+import { Eye, FileText, Download, Search } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { ApiError } from "@/lib/api/client";
+import { cvsApi } from "@/lib/api";
+import type { CvListItem } from "@/lib/api/types";
 
-const mockHistory = [
-  { id: 1, cargo: "Desarrollador Frontend", fecha: "02 Abr 2026", tipo: "Creado", versiones: 3 },
-  { id: 2, cargo: "Analista de Datos", fecha: "28 Mar 2026", tipo: "Mejorado", versiones: 2 },
-  { id: 3, cargo: "Ingeniero de Software", fecha: "25 Mar 2026", tipo: "Creado", versiones: 1 },
-  { id: 4, cargo: "Product Manager", fecha: "20 Mar 2026", tipo: "Mejorado", versiones: 4 },
-  { id: 5, cargo: "Diseñador UX/UI", fecha: "15 Mar 2026", tipo: "Creado", versiones: 2 },
-  { id: 6, cargo: "DevOps Engineer", fecha: "10 Mar 2026", tipo: "Mejorado", versiones: 1 },
-];
+const formatDate = (value: string) =>
+  new Intl.DateTimeFormat("es-CL", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
+
+const getCvTypeLabel = (item: CvListItem) => {
+  if (item.currentVersion?.createdByProcess === "ai") {
+    return "IA";
+  }
+
+  if (item.sourceType === "improved") {
+    return "Mejorado";
+  }
+
+  if (item.sourceType === "mixed") {
+    return "Mixto";
+  }
+
+  return "Creado";
+};
 
 const Historial = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const filtered = mockHistory.filter((item) =>
-    item.cargo.toLowerCase().includes(search.toLowerCase())
+
+  const { data: cvs = [], isLoading, isError } = useQuery({
+    queryKey: ["cvs"],
+    queryFn: cvsApi.list,
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: ({ cvId, isArchived }: { cvId: string; isArchived: boolean }) =>
+      cvsApi.updateArchiveState(cvId, isArchived),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cvs"] });
+    },
+  });
+
+  const filtered = useMemo(
+    () =>
+      cvs.filter((item) =>
+        item.targetRole.toLowerCase().includes(search.toLowerCase()),
+      ),
+    [cvs, search],
   );
+
+  const handleToggleArchive = async (item: CvListItem) => {
+    try {
+      await archiveMutation.mutateAsync({
+        cvId: item.id,
+        isArchived: !item.isArchived,
+      });
+
+      toast({
+        title: item.isArchived ? "CV restaurado" : "CV archivado",
+        description: item.targetRole,
+      });
+    } catch (error) {
+      toast({
+        title: "No fue posible actualizar el historial",
+        description:
+          error instanceof ApiError
+            ? error.message
+            : "Inténtalo otra vez en unos segundos.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownload = (item: CvListItem) => {
+    const generatedFileUrl = item.currentVersion?.generatedFileUrl;
+
+    if (!generatedFileUrl) {
+      toast({
+        title: "PDF aún no disponible",
+        description: "Ese CV todavía no tiene un archivo generado para descargar.",
+      });
+      return;
+    }
+
+    window.open(generatedFileUrl, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -38,7 +116,19 @@ const Historial = () => {
       </div>
 
       <div className="space-y-3">
-        {filtered.map((item) => (
+        {isLoading && (
+          <div className="text-center py-12 text-muted-foreground">
+            Cargando historial...
+          </div>
+        )}
+
+        {!isLoading && isError && (
+          <div className="text-center py-12 text-muted-foreground">
+            No fue posible cargar el historial.
+          </div>
+        )}
+
+        {!isLoading && !isError && filtered.map((item) => (
           <Card key={item.id}>
             <CardContent className="flex items-center justify-between p-4">
               <div className="flex items-center gap-4">
@@ -46,22 +136,41 @@ const Historial = () => {
                   <FileText className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="font-medium">{item.cargo}</p>
-                  <p className="text-sm text-muted-foreground">{item.fecha} · {item.versiones} versión(es)</p>
+                  <p className="font-medium">{item.targetRole}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatDate(item.updatedAt)} · {item.versionsCount} versión(es)
+                    {item.isArchived ? " · Archivado" : ""}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant={item.tipo === "Creado" ? "default" : "secondary"}>
-                  {item.tipo}
+                <Badge variant={item.currentVersion?.createdByProcess === "ai" ? "default" : "secondary"}>
+                  {getCvTypeLabel(item)}
                 </Badge>
-                <Button variant="ghost" size="icon"><Eye className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="icon"><Download className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate(`/historial/${item.id}`)}
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => handleDownload(item)}>
+                  <Download className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleToggleArchive(item)}
+                  disabled={archiveMutation.isPending}
+                >
+                  {item.isArchived ? "Restaurar" : "Archivar"}
+                </Button>
               </div>
             </CardContent>
           </Card>
         ))}
-        {filtered.length === 0 && (
+
+        {!isLoading && !isError && filtered.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
             No se encontraron resultados
           </div>

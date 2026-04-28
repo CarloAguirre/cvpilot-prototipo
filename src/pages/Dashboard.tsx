@@ -1,16 +1,54 @@
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileUp, FilePlus, History, BarChart3, ArrowRight, FileText, TrendingUp } from "lucide-react";
+import { cvsApi } from "@/lib/api";
 
-const stats = [
-  { label: "CVs Generados", value: "12", icon: FileText, color: "text-primary" },
-  { label: "CVs Mejorados", value: "8", icon: TrendingUp, color: "text-accent" },
-  { label: "Versiones Guardadas", value: "23", icon: History, color: "text-warning" },
-];
+const formatDate = (value: string) =>
+  new Intl.DateTimeFormat("es-CL", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { data: cvs = [], isLoading } = useQuery({
+    queryKey: ["cvs"],
+    queryFn: cvsApi.list,
+  });
+
+  const stats = useMemo(
+    () => [
+      {
+        label: "CVs Generados",
+        value: cvs.length.toString(),
+        icon: FileText,
+        color: "text-primary",
+      },
+      {
+        label: "CVs con IA",
+        value: cvs
+          .filter((item) => item.currentVersion?.createdByProcess === "ai")
+          .length.toString(),
+        icon: TrendingUp,
+        color: "text-accent",
+      },
+      {
+        label: "Versiones Guardadas",
+        value: cvs
+          .reduce((total, item) => total + item.versionsCount, 0)
+          .toString(),
+        icon: History,
+        color: "text-warning",
+      },
+    ],
+    [cvs],
+  );
+
+  const recentActivity = useMemo(() => cvs.slice(0, 3), [cvs]);
 
   return (
     <div className="space-y-8 max-w-5xl">
@@ -30,7 +68,7 @@ const Dashboard = () => {
                 <stat.icon className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{stat.value}</p>
+                <p className="text-2xl font-bold">{isLoading ? "..." : stat.value}</p>
                 <p className="text-sm text-muted-foreground">{stat.label}</p>
               </div>
             </CardContent>
@@ -88,24 +126,30 @@ const Dashboard = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {[
-              { cargo: "Desarrollador Frontend", fecha: "02 Abr 2026", tipo: "Creado" },
-              { cargo: "Analista de Datos", fecha: "28 Mar 2026", tipo: "Mejorado" },
-              { cargo: "Ingeniero de Software", fecha: "25 Mar 2026", tipo: "Creado" },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
+            {isLoading && (
+              <div className="text-sm text-muted-foreground">Cargando actividad reciente...</div>
+            )}
+
+            {!isLoading && recentActivity.map((item) => (
+              <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
                 <div className="flex items-center gap-3">
-                  <div className={`h-2 w-2 rounded-full ${item.tipo === "Creado" ? "bg-accent" : "bg-primary"}`} />
+                  <div className={`h-2 w-2 rounded-full ${item.currentVersion?.createdByProcess === "ai" ? "bg-accent" : "bg-primary"}`} />
                   <div>
-                    <p className="font-medium text-sm">{item.cargo}</p>
-                    <p className="text-xs text-muted-foreground">{item.fecha}</p>
+                    <p className="font-medium text-sm">{item.targetRole}</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(item.updatedAt)}</p>
                   </div>
                 </div>
                 <span className="text-xs px-2 py-1 rounded-full bg-secondary text-muted-foreground">
-                  {item.tipo}
+                  {item.currentVersion?.createdByProcess === "ai" ? "IA" : "Manual"}
                 </span>
               </div>
             ))}
+
+            {!isLoading && recentActivity.length === 0 && (
+              <div className="text-sm text-muted-foreground">
+                Todavía no tienes CVs generados.
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

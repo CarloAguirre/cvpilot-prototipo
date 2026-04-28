@@ -6,6 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowRight, ArrowLeft, CheckCircle2, Sparkles, FileText, Plus, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { ApiError } from "@/lib/api/client";
+import { cvsApi } from "@/lib/api";
+import type { CvDetail, GenerateCvFromFormPayload } from "@/lib/api/types";
 
 interface Experiencia {
   empresa: string;
@@ -22,7 +26,10 @@ interface Educacion {
 
 const CrearCV = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [step, setStep] = useState(1);
+  const [generatedCv, setGeneratedCv] = useState<CvDetail | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Step 1: Datos personales
   const [nombre, setNombre] = useState("");
@@ -62,6 +69,99 @@ const CrearCV = () => {
     const updated = [...educacion];
     updated[i][field] = value;
     setEducacion(updated);
+  };
+
+  const parsedSkills = habilidades
+    .split(",")
+    .map((skill) => skill.trim())
+    .filter(Boolean);
+
+  const buildPayload = (): GenerateCvFromFormPayload => ({
+    title: cargoObjetivo ? `CV ${cargoObjetivo}` : undefined,
+    targetRole: cargoObjetivo.trim(),
+    stylePreset: "ats",
+    personalDetails: {
+      fullName: nombre.trim(),
+      email: email.trim(),
+      phone: telefono.trim() || undefined,
+      location: ubicacion.trim() || undefined,
+      professionalSummary: resumen.trim() || undefined,
+    },
+    workExperiences: experiencias
+      .filter(
+        (exp) =>
+          exp.empresa.trim() ||
+          exp.cargo.trim() ||
+          exp.periodo.trim() ||
+          exp.descripcion.trim(),
+      )
+      .map((exp) => ({
+        companyName: exp.empresa.trim(),
+        jobTitle: exp.cargo.trim(),
+        periodLabel: exp.periodo.trim(),
+        description: exp.descripcion.trim() || undefined,
+      })),
+    educationEntries: educacion
+      .filter(
+        (edu) =>
+          edu.institucion.trim() || edu.titulo.trim() || edu.periodo.trim(),
+      )
+      .map((edu) => ({
+        institutionName: edu.institucion.trim(),
+        degreeTitle: edu.titulo.trim(),
+        periodLabel: edu.periodo.trim(),
+      })),
+    skills: parsedSkills,
+    skillsText: habilidades.trim() || undefined,
+  });
+
+  const canGenerate =
+    Boolean(nombre.trim()) &&
+    Boolean(email.trim()) &&
+    Boolean(cargoObjetivo.trim());
+
+  const handleGenerateCv = async () => {
+    try {
+      setIsGenerating(true);
+      const createdCv = await cvsApi.generateFromForm(buildPayload());
+      setGeneratedCv(createdCv);
+      setStep(5);
+      toast({
+        title: "CV generado",
+        description: "La vista previa ya refleja la versión creada con IA.",
+      });
+    } catch (error) {
+      toast({
+        title: "No fue posible generar el CV",
+        description:
+          error instanceof ApiError
+            ? error.message
+            : "Revisa los datos del formulario e inténtalo otra vez.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const currentVersion = generatedCv?.currentVersion;
+  const currentPersonalDetail = currentVersion?.personalDetail;
+  const previewSkills = currentVersion?.skills.length
+    ? currentVersion.skills
+        .map((versionSkill) => versionSkill.skill?.name)
+        .filter((skillName): skillName is string => Boolean(skillName))
+    : parsedSkills;
+
+  const handleDownloadPdf = () => {
+    if (!currentVersion?.generatedFileUrl) {
+      toast({
+        title: "PDF aún no disponible",
+        description: "La generación de PDF será el siguiente corte del flujo.",
+      });
+      return;
+    }
+
+    window.open(currentVersion.generatedFileUrl, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -225,8 +325,8 @@ const CrearCV = () => {
               <Button variant="outline" onClick={() => setStep(3)} className="gap-2">
                 <ArrowLeft className="h-4 w-4" /> Atrás
               </Button>
-              <Button onClick={() => setStep(5)} disabled={!cargoObjetivo} className="gap-2">
-                Generar con IA <Sparkles className="h-4 w-4" />
+              <Button onClick={handleGenerateCv} disabled={!canGenerate || isGenerating} className="gap-2">
+                {isGenerating ? "Generando..." : "Generar con IA"} <Sparkles className="h-4 w-4" />
               </Button>
             </div>
           </CardContent>
@@ -238,17 +338,109 @@ const CrearCV = () => {
         <Card>
           <CardHeader>
             <CardTitle>Vista previa del CV</CardTitle>
-            <CardDescription>CV generado por IA para: {cargoObjetivo}</CardDescription>
+            <CardDescription>
+              {generatedCv
+                ? `CV generado por IA para: ${generatedCv.targetRole}`
+                : `CV generado por IA para: ${cargoObjetivo}`}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="border rounded-xl p-6 bg-secondary/30 min-h-[300px] flex items-center justify-center">
-              <div className="text-center space-y-3">
-                <Sparkles className="h-12 w-12 text-accent mx-auto" />
-                <p className="font-medium">Aquí se mostrará el CV generado</p>
-                <p className="text-sm text-muted-foreground">
-                  La generación con IA se implementará próximamente
-                </p>
-              </div>
+            <div className="border rounded-xl p-6 bg-secondary/30 min-h-[300px]">
+              {generatedCv && currentVersion ? (
+                <div className="space-y-6">
+                  <div className="space-y-1">
+                    <h2 className="text-2xl font-semibold tracking-tight">
+                      {currentPersonalDetail?.fullName ?? nombre}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {[currentPersonalDetail?.email ?? email, currentPersonalDetail?.phone ?? telefono, currentPersonalDetail?.location ?? ubicacion]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Resumen profesional
+                    </h3>
+                    <p className="text-sm leading-6 text-foreground/90">
+                      {currentVersion.summaryText ?? currentPersonalDetail?.professionalSummary ?? "Sin resumen generado todavía."}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Experiencia
+                    </h3>
+                    <div className="space-y-3">
+                      {currentVersion.workExperiences.length ? (
+                        currentVersion.workExperiences.map((experience) => (
+                          <div key={experience.id} className="space-y-1">
+                            <p className="font-medium">
+                              {experience.jobTitle} · {experience.companyName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{experience.periodLabel}</p>
+                            {experience.description && (
+                              <p className="text-sm text-foreground/90">{experience.description}</p>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Sin experiencia cargada.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Educación
+                    </h3>
+                    <div className="space-y-3">
+                      {currentVersion.educationEntries.length ? (
+                        currentVersion.educationEntries.map((entry) => (
+                          <div key={entry.id} className="space-y-1">
+                            <p className="font-medium">{entry.degreeTitle}</p>
+                            <p className="text-sm text-foreground/90">{entry.institutionName}</p>
+                            <p className="text-xs text-muted-foreground">{entry.periodLabel}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Sin educación cargada.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Habilidades
+                    </h3>
+                    {previewSkills.length ? (
+                      <div className="flex flex-wrap gap-2">
+                        {previewSkills.map((skill) => (
+                          <span
+                            key={skill}
+                            className="rounded-full border bg-background px-3 py-1 text-xs font-medium"
+                          >
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Sin habilidades registradas.</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full min-h-[240px] flex items-center justify-center">
+                  <div className="text-center space-y-3">
+                    <Sparkles className="h-12 w-12 text-accent mx-auto" />
+                    <p className="font-medium">Todavía no hay una generación activa</p>
+                    <p className="text-sm text-muted-foreground">
+                      Completa el formulario y ejecuta la generación desde el paso anterior.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(4)} className="gap-2">
@@ -256,9 +448,9 @@ const CrearCV = () => {
               </Button>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => navigate("/historial")}>
-                  Guardar en historial
+                  Ver historial
                 </Button>
-                <Button className="gap-2">
+                <Button className="gap-2" onClick={handleDownloadPdf}>
                   Descargar PDF <FileText className="h-4 w-4" />
                 </Button>
               </div>

@@ -10,6 +10,7 @@ import type {
   CvHistoryResponse,
   CvListItem,
   DashboardSummary,
+  GenerateCvFromFormPayload,
   ImprovementRequestSummary,
   LoginPayload,
   MonthlyReportItem,
@@ -18,6 +19,7 @@ import type {
   ReportByVersionTypeItem,
   ReportSnapshot,
   UpdateImprovementRequestPayload,
+  UpdateManualCvVersionPayload,
   UpdateProfilePayload,
   UpdateSettingsPayload,
   UploadedFileRecord,
@@ -63,6 +65,11 @@ export const cvsApi = {
       method: "POST",
       body: payload,
     }),
+  generateFromForm: (payload: GenerateCvFromFormPayload) =>
+    apiRequest<CvDetail>("/cvs/generate-from-form", {
+      method: "POST",
+      body: payload,
+    }),
   getOne: (cvId: string) => apiRequest<CvDetail>(`/cvs/${cvId}`),
   getHistory: (cvId: string) =>
     apiRequest<CvHistoryResponse>(`/cvs/${cvId}/history`),
@@ -76,6 +83,14 @@ export const cvsApi = {
     payload: CreateImprovedCvVersionPayload,
   ) =>
     apiRequest<CvDetail>(`/cvs/${cvId}/versions/improved`, {
+      method: "POST",
+      body: payload,
+    }),
+  createManualEditedVersion: (
+    cvId: string,
+    payload: UpdateManualCvVersionPayload,
+  ) =>
+    apiRequest<CvDetail>(`/cvs/${cvId}/versions/manual-edit`, {
       method: "POST",
       body: payload,
     }),
@@ -105,6 +120,10 @@ export const improvementsApi = {
     apiRequest<ImprovementRequestSummary>("/improvement-requests", {
       method: "POST",
       body: payload,
+    }),
+  process: (requestId: string) =>
+    apiRequest<CvDetail>(`/improvement-requests/${requestId}/process`, {
+      method: "POST",
     }),
   update: (requestId: string, payload: UpdateImprovementRequestPayload) =>
     apiRequest<ImprovementRequestSummary>(`/improvement-requests/${requestId}`, {
