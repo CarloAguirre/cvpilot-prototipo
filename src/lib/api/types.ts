@@ -223,6 +223,22 @@ export interface MonthlyReportItem {
   totalVersions: number;
 }
 
+export interface CvActivityReportPayload {
+  totalCvs: number;
+  activeCvs: number;
+  archivedCvs: number;
+  totalVersions: number;
+  createdVersions: number;
+  improvedVersions: number;
+  manualEditVersions: number;
+  aiGeneratedVersions: number;
+  manualVersions: number;
+  lastActivityAt: string | null;
+  topTargetRoles: ReportByRoleItem[];
+  versionsByType: ReportByVersionTypeItem[];
+  monthlyVersions: MonthlyReportItem[];
+}
+
 export interface ReportSnapshot {
   id: string;
   userId: string;
@@ -230,6 +246,11 @@ export interface ReportSnapshot {
   reportPeriod: string | null;
   payload: unknown;
   generatedAt: string;
+}
+
+export interface CvActivityReportSnapshot extends ReportSnapshot {
+  reportType: "cv_activity_summary";
+  payload: CvActivityReportPayload;
 }
 
 export interface LoginPayload {

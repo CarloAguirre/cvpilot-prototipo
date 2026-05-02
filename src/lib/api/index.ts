@@ -9,6 +9,7 @@ import type {
   CvDetail,
   CvHistoryResponse,
   CvListItem,
+  CvActivityReportSnapshot,
   DashboardSummary,
   GenerateCvFromFormPayload,
   ImprovementRequestSummary,
@@ -144,5 +145,9 @@ export const reportsApi = {
     apiRequest<ReportSnapshot>("/reports/snapshots", {
       method: "POST",
       body: payload,
+    }),
+  createDatabaseSnapshot: () =>
+    apiRequest<CvActivityReportSnapshot>("/reports/snapshots/database", {
+      method: "POST",
     }),
 };
